@@ -298,14 +298,18 @@ def ask_bot(q, product, user):
 # STREAMLIT UI
 # -------------------------------
 
+# -------------------------------
 # SESSION STATE
+# -------------------------------
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 
 if "page" not in st.session_state:
     st.session_state.page = "scanner"
 
-# ✅ DAILY RECORD INIT
+# -------------------------------
+#DAILY RECORD INIT
+# -------------------------------
 if "daily" not in st.session_state:
     st.session_state.daily = {
         "energy": 0,
@@ -315,7 +319,8 @@ if "daily" not in st.session_state:
         "sugar": 0,
         "sodium": 0
     }
-    # -------------------------------
+
+# -------------------------------
 # DAILY LIMIT CHECK FUNCTION
 # -------------------------------
 def check_limits(d):
@@ -421,28 +426,28 @@ else:
                     product = get_product_from_db(barcode)
 
                     if product:
-                        st.success("⚡ Loaded from database (fast)")
+                        st.success("Loaded from database (fast)")
                     else:
                     # 2. Fetch from API
                         product = fetch_product(barcode)
 
-                    if "error" in product:
-                        st.error(product["error"])
-                        st.stop()
+                        if "error" in product:
+                            st.error(product["error"])
+                            st.stop()
     
-                    # 3. Save to database
-                    save_product_to_db(barcode, product)
-                    st.success("✅ Fetched from API & saved")
+                        # 3. Save to database
+                        save_product_to_db(barcode, product)
+                        st.success("Fetched from API & saved")
 
-                    if "error" in product:
-                        st.error(product["error"])
-                    else:
-                        info = extract(product)
+                    #if "error" in product:
+                    #    st.error(product["error"])
+                    #else:
+                    info = extract(product)
 
-                        # STORE PRODUCT + NUTRIENTS
-                        st.session_state.product = info
+                    # STORE PRODUCT + NUTRIENTS
+                    st.session_state.product = info
 
-                        st.session_state.last_n = {
+                    st.session_state.last_n = {
                             "energy": float(product.get("nutriments", {}).get("energy-kcal_100g", 0)),
                             "fat": float(product.get("nutriments", {}).get("fat_100g", 0)),
                             "sat_fat": float(product.get("nutriments", {}).get("saturated-fat_100g", 0)),
@@ -451,11 +456,11 @@ else:
                             "sodium": float(product.get("nutriments", {}).get("sodium_100g", 0)) * 1000
                         }
 
-                        st.success("Product Found")
-                        st.json(info)
+                    st.success("Product Found")
+                    st.json(info)
 
-                        try:
-                            risk_data = {
+                    try:
+                        risk_data = {
                                 "energy": float(info.get("Energy (kcal)", 0)),
                                 "fat": float(info.get("Fat (g)", 0)),
                                 "sat_fat": float(product.get("nutriments", {}).get("saturated-fat_100g", 0)),
@@ -463,32 +468,32 @@ else:
                                 "sodium": float(product.get("nutriments", {}).get("sodium_100g", 0)) * 1000
                             }
 
-                            score, warnings = calculate_risk(risk_data)
-                            status = get_final_status(score)
+                        score, warnings = calculate_risk(risk_data)
+                        status = get_final_status(score)
 
-                            st.subheader(" FSSAI Nutrition Analysis")
-                            st.error(f"Nutri Score: {score}")
-                            st.warning(f"Status: {status}")
+                        st.subheader(" FSSAI Nutrition Analysis")
+                        st.error(f"Nutri Score: {score}")
+                        st.warning(f"Status: {status}")
 
-                            st.subheader("Warnings:")
-                            for w in warnings:
-                                st.write(f"- {w}")
+                        st.subheader("Warnings:")
+                        for w in warnings:
+                            st.write(f"- {w}")
 
-                            # AI ANALYSIS
-                            st.subheader(" AI Health Analysis")
+                        # AI ANALYSIS
+                        st.subheader(" AI Health Analysis")
 
-                            with st.spinner("Analyzing with AI..."):
-                                try:
-                                    ai_result = analyze(
-                                        st.session_state.product,
-                                        st.session_state.user
-                                    )
-                                    st.write(ai_result)
-                                except Exception as e:
-                                    st.error(f"AI analysis failed: {e}")
+                        with st.spinner("Analyzing with AI..."):
+                            try:
+                                ai_result = analyze(
+                                    st.session_state.product,
+                                    st.session_state.user
+                                )
+                                st.write(ai_result)
+                            except Exception as e:
+                                st.error(f"AI analysis failed: {e}")
 
-                        except Exception as e:
-                            st.warning(f"Risk analysis not available: {e}")
+                    except Exception as e:
+                        st.warning(f"Risk analysis not available: {e}")
 
         # -------------------------------
         # ADD TO DAILY BUTTON (FIXED)
