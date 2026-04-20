@@ -1,0 +1,10 @@
+# Sensitive API Keys
+.env
+
+# Local Databases (contain user passwords)
+users.db
+products.db
+
+# Python cache files
+__pycache__/
+*.pyc
