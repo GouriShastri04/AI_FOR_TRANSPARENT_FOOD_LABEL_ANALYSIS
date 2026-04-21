@@ -4,9 +4,8 @@ import requests
 from groq import Groq
 import json
 
-# -------------------------------
-# CONFIG
-# -------------------------------
+
+# CONFIGURATION
 import os
 from dotenv import load_dotenv
 from groq import Groq
@@ -16,9 +15,8 @@ load_dotenv()
 def get_client():
     return Groq(api_key=os.getenv("GROQ_API_KEY"))
 
-# -------------------------------
+
 # DATABASE SETUP
-# -------------------------------
 conn = sqlite3.connect("users.db", check_same_thread=False)
 c = conn.cursor()
 
@@ -33,9 +31,9 @@ CREATE TABLE IF NOT EXISTS users (
 """)
 conn.commit()
 
-# -------------------------------
-# AUTH FUNCTIONS
-# -------------------------------
+
+
+# AUTHORIZATION FUNCTIONS
 def register_user(username, password, age, condition, allergy):
     try:
         c.execute("INSERT INTO users VALUES (?, ?, ?, ?, ?)",
@@ -50,9 +48,8 @@ def login_user(username, password):
               (username, password))
     return c.fetchone()
 
-# -------------------------------
+
 # PRODUCTS DATABASE
-# -------------------------------
 conn_products = sqlite3.connect("products.db", check_same_thread=False)
 cp = conn_products.cursor()
 
@@ -64,9 +61,8 @@ cp.execute("""
     """)
 conn_products.commit()
 
-# -------------------------------
-# FETCH PRODUCT FROM DATABASE DATABASE
-# -------------------------------
+
+# FETCH PRODUCT FROM PRODUCTS DATABASE
 def get_product_from_db(barcode):
     cp.execute("SELECT product_json FROM products WHERE barcode=?", (barcode,))
     row = cp.fetchone()
@@ -76,9 +72,8 @@ def get_product_from_db(barcode):
     
     return None
 
-# -------------------------------
-# FETCH PRODUCT FROM DATABASE DATABASE
-# -------------------------------
+
+# SAVE PRODUCT TO PRODUCTS DATABASE
 def save_product_to_db(barcode, product):
     cp.execute(
         "INSERT OR REPLACE INTO products VALUES (?, ?)",
@@ -86,18 +81,16 @@ def save_product_to_db(barcode, product):
     )
     conn_products.commit()
 
-# -------------------------------
+
 # BARCODE FORMAT
-# -------------------------------
 def format_barcode(barcode):
     barcode = ''.join(filter(str.isdigit, str(barcode)))
     if len(barcode) not in [8, 12, 13]:
         raise ValueError("Invalid barcode")
     return barcode
 
-# -------------------------------
-# FETCH PRODUCT
-# -------------------------------
+
+# FETCH PRODUCT FROM API
 def fetch_product(barcode):
     try:
         formatted_barcode = format_barcode(barcode)
@@ -111,7 +104,7 @@ def fetch_product(barcode):
 
         response = requests.get(url, headers=headers, timeout=10)
 
-        # DEBUG (you can remove later)
+        # DEBUG
         print("Status Code:", response.status_code)
 
         if response.status_code != 200:
@@ -134,10 +127,7 @@ def fetch_product(barcode):
         return {"error": str(e)}
 
 
-
-# -------------------------------
-# EXTRACT INFO
-# -------------------------------
+# EXTRACT INFORMATION ABOUT PRODUCT
 def extract(product):
     nutriments = product.get("nutriments", {})
 
@@ -160,7 +150,7 @@ def extract(product):
         "Sugar (g)": nutriments.get("sugars_100g", "N/A"),
         "Salt (g)": nutriments.get("salt_100g", "N/A"),
     }
-# fssai
+# FSSAI
 LIMITS_FOR_DIFFERENT_AGE_GROUP = {
     "Children": {
         "energy_kcal": 1600,
@@ -228,12 +218,13 @@ def get_final_status(score):
     elif score <= 7:
         return "Moderate "
     elif score <= 12:
-        return "High Nutrition Value "
+        return "Low Nutrition Value "
     else:
-        return "Very High Nutrition Value "
-# -------------------------------
+        return "Very Low Nutrition Value "
+    
+
+
 # AI ANALYSIS
-# -------------------------------
 def analyze(product, user):
     client = get_client()
 
@@ -266,9 +257,8 @@ def analyze(product, user):
 
     return res.choices[0].message.content
 
-# -------------------------------
+
 # CHATBOT
-# -------------------------------
 def ask_bot(q, product, user):
     client = get_client()
 
@@ -294,22 +284,18 @@ def ask_bot(q, product, user):
 
     return res.choices[0].message.content
 
-# -------------------------------
-# STREAMLIT UI
-# -------------------------------
 
-# -------------------------------
+# STREAMLIT UI
+
 # SESSION STATE
-# -------------------------------
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 
 if "page" not in st.session_state:
     st.session_state.page = "scanner"
 
-# -------------------------------
-#DAILY RECORD INIT
-# -------------------------------
+
+#DAILY RECORD INITIALIZATION
 if "daily" not in st.session_state:
     st.session_state.daily = {
         "energy": 0,
@@ -320,9 +306,8 @@ if "daily" not in st.session_state:
         "sodium": 0
     }
 
-# -------------------------------
+
 # DAILY LIMIT CHECK FUNCTION
-# -------------------------------
 def check_limits(d):
     warnings = []
 
@@ -341,9 +326,8 @@ def check_limits(d):
 
     return warnings
 
-# -------------------------------
-# BEFORE LOGIN (REGISTER / LOGIN)
-# -------------------------------
+
+# REGISTER / LOGIN
 if not st.session_state.logged_in:
 
     menu = ["Login", "Register"]
@@ -394,9 +378,7 @@ if not st.session_state.logged_in:
                 st.error("Invalid credentials")
 
 
-# -------------------------------
-# AFTER LOGIN
-# -------------------------------
+# MAIN PAGE
 else:
     # SIDEBAR DAILY RECORD
     st.sidebar.subheader(" Daily Consumption")
@@ -406,7 +388,7 @@ else:
     if warnings:
         st.sidebar.error(" Limits exceeded")
 
-    # -------- SCANNER PAGE --------
+    # SCANNER PAGE
     if st.session_state.page == "scanner":
 
         st.title(" Packaged Food Label Analyzer")
@@ -495,9 +477,8 @@ else:
                     except Exception as e:
                         st.warning(f"Risk analysis not available: {e}")
 
-        # -------------------------------
-        # ADD TO DAILY BUTTON (FIXED)
-        # -------------------------------
+        
+        # ADD TO DAILY BUTTON
         if "last_n" in st.session_state:
 
             if st.button("Add to Daily Record"):
@@ -524,7 +505,7 @@ else:
                 st.session_state.page = "chatbot"
                 st.rerun()
 
-    # -------- CHATBOT PAGE --------
+    # CHATBOT PAGE
     elif st.session_state.page == "chatbot":
 
         st.title(" Chat with AI")
