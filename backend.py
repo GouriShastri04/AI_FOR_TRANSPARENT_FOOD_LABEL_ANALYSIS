@@ -5,6 +5,7 @@ from groq import Groq
 import json
 
 
+# CONFIGURATION
 import os
 from dotenv import load_dotenv
 from groq import Groq
@@ -15,6 +16,7 @@ def get_client():
     return Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 
+# DATABASE SETUP
 conn = sqlite3.connect("users.db", check_same_thread=False)
 c = conn.cursor()
 
@@ -31,6 +33,7 @@ conn.commit()
 
 
 
+# AUTHORIZATION FUNCTIONS
 def register_user(username, password, age, condition, allergy):
     try:
         c.execute("INSERT INTO users VALUES (?, ?, ?, ?, ?)",
@@ -46,6 +49,7 @@ def login_user(username, password):
     return c.fetchone()
 
 
+# PRODUCTS DATABASE
 conn_products = sqlite3.connect("products.db", check_same_thread=False)
 cp = conn_products.cursor()
 
@@ -58,6 +62,7 @@ cp.execute("""
 conn_products.commit()
 
 
+# FETCH PRODUCT FROM PRODUCTS DATABASE
 def get_product_from_db(barcode):
     cp.execute("SELECT product_json FROM products WHERE barcode=?", (barcode,))
     row = cp.fetchone()
@@ -68,6 +73,7 @@ def get_product_from_db(barcode):
     return None
 
 
+# SAVE PRODUCT TO PRODUCTS DATABASE
 def save_product_to_db(barcode, product):
     cp.execute(
         "INSERT OR REPLACE INTO products VALUES (?, ?)",
@@ -76,6 +82,7 @@ def save_product_to_db(barcode, product):
     conn_products.commit()
 
 
+# BARCODE FORMAT
 def format_barcode(barcode):
     barcode = ''.join(filter(str.isdigit, str(barcode)))
     if len(barcode) not in [8, 12, 13]:
@@ -83,6 +90,7 @@ def format_barcode(barcode):
     return barcode
 
 
+# FETCH PRODUCT FROM API
 def fetch_product(barcode):
     try:
         formatted_barcode = format_barcode(barcode)
@@ -96,7 +104,7 @@ def fetch_product(barcode):
 
         response = requests.get(url, headers=headers, timeout=10)
 
-        
+        # DEBUG
         print("Status Code:", response.status_code)
 
         if response.status_code != 200:
@@ -119,6 +127,7 @@ def fetch_product(barcode):
         return {"error": str(e)}
 
 
+# EXTRACT INFORMATION ABOUT PRODUCT
 def extract(product):
     nutriments = product.get("nutriments", {})
 
@@ -141,7 +150,7 @@ def extract(product):
         "Sugar (g)": nutriments.get("sugars_100g", "N/A"),
         "Salt (g)": nutriments.get("salt_100g", "N/A"),
     }
-
+# FSSAI
 LIMITS_FOR_DIFFERENT_AGE_GROUP = {
     "Children": {
         "energy_kcal": 1600,
@@ -156,7 +165,7 @@ LIMITS_FOR_DIFFERENT_AGE_GROUP = {
         "salt_g": 5
     }
     }
-
+# Nutri Score Based on FASSI
 def get_risk_level(value, rda):
     percent = (value / rda) * 100
 
@@ -176,26 +185,26 @@ def calculate_risk(data):
     total_score = 0
     warnings = []
 
-    
+    # Energy
     score, level = get_risk_level(data["energy"], 2000)
     total_score += score
 
-    
+    # Fat
     score, level = get_risk_level(data["fat"], 67)
     total_score += score
     warnings.append(f"Fat: {level}")
 
-    
+    # Saturated Fat
     score, level = get_risk_level(data["sat_fat"], 22)
     total_score += score
     warnings.append(f"Saturated Fat: {level}")
 
-    
+    # Sugar
     score, level = get_risk_level(data["sugar"], 50)
     total_score += score
     warnings.append(f"Sugar: {level}")
 
-    
+    # Sodium
     score, level = get_risk_level(data["sodium"], 2000)
     total_score += score
     warnings.append(f"Sodium: {level}")
@@ -215,11 +224,17 @@ def get_final_status(score):
     
 
 
+# AI ANALYSIS
 def analyze(product, user):
     client = get_client()
 
     prompt = f"""
     You are a nutrition expert.
+
+    IMPORTANT INSTRUCTIONS:
+    - Use ONLY the given extracted product data for analysis
+    - Do NOT assume or add any external information
+    - Base your reasoning strictly on the provided values
 
     Product Data:
     {product}
@@ -248,6 +263,7 @@ def analyze(product, user):
     return res.choices[0].message.content
 
 
+# CHATBOT
 def ask_bot(q, product, user):
     client = get_client()
 
@@ -274,7 +290,9 @@ def ask_bot(q, product, user):
     return res.choices[0].message.content
 
 
+# STREAMLIT UI
 
+# SESSION STATE
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 
@@ -282,6 +300,7 @@ if "page" not in st.session_state:
     st.session_state.page = "scanner"
 
 
+#DAILY RECORD INITIALIZATION
 if "daily" not in st.session_state:
     st.session_state.daily = {
         "energy": 0,
@@ -293,6 +312,7 @@ if "daily" not in st.session_state:
     }
 
 
+# DAILY LIMIT CHECK FUNCTION
 def check_limits(d):
     warnings = []
 
@@ -312,6 +332,7 @@ def check_limits(d):
     return warnings
 
 
+# REGISTER / LOGIN
 if not st.session_state.logged_in:
 
     menu = ["Login", "Register"]
@@ -362,8 +383,9 @@ if not st.session_state.logged_in:
                 st.error("Invalid credentials")
 
 
+# MAIN PAGE
 else:
-    
+    # SIDEBAR DAILY RECORD
     st.sidebar.subheader(" Daily Consumption")
     st.sidebar.json(st.session_state.daily)
 
@@ -371,7 +393,7 @@ else:
     if warnings:
         st.sidebar.error(" Limits exceeded")
 
-    
+    # SCANNER PAGE
     if st.session_state.page == "scanner":
 
         st.title(" Packaged Food Label Analyzer")
@@ -387,20 +409,20 @@ else:
                 st.warning("Enter barcode first")
             else:
                 with st.spinner("Fetching product..."):
-                    
+                    # 1. Check database first
                     product = get_product_from_db(barcode)
 
                     if product:
                         st.success("Loaded from database (fast)")
                     else:
-                    
+                    # 2. Fetch from API
                         product = fetch_product(barcode)
 
                         if "error" in product:
                             st.error(product["error"])
                             st.stop()
     
-                        
+                        # 3. Save to database
                         save_product_to_db(barcode, product)
                         st.success("Fetched from API & saved")
 
@@ -409,7 +431,7 @@ else:
                     #else:
                     info = extract(product)
 
-                    
+                    # STORE PRODUCT + NUTRIENTS
                     st.session_state.product = info
 
                     st.session_state.last_n = {
@@ -444,7 +466,7 @@ else:
                         for w in warnings:
                             st.write(f"- {w}")
 
-                        
+                        # AI ANALYSIS
                         st.subheader(" AI Health Analysis")
 
                         with st.spinner("Analyzing with AI..."):
@@ -461,7 +483,7 @@ else:
                         st.warning(f"Risk analysis not available: {e}")
 
         
-        
+        # ADD TO DAILY BUTTON
         if "last_n" in st.session_state:
 
             if st.button("Add to Daily Record"):
@@ -482,13 +504,13 @@ else:
                 else:
                     st.success(" Within daily limits")
 
-        
+        # CHATBOT BUTTON
         if "product" in st.session_state:
             if st.button("For more queries, Ask Chatbot"):
                 st.session_state.page = "chatbot"
                 st.rerun()
 
-    
+    # CHATBOT PAGE
     elif st.session_state.page == "chatbot":
 
         st.title(" Chat with AI")
